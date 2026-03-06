@@ -216,6 +216,82 @@ while True:
 - Results improve significantly after the first minute of continuous data
 - The algorithm is based on: Wang et al., "Understanding and Modeling of WiFi Signal Based Human Activity Recognition", MobiCom 2015
 
+## MR60BHA1 Radar Driver (60 GHz mmWave)
+
+For applications requiring higher accuracy or faster response, the `mr60bha1.py`
+module provides a pure-Python MicroPython driver for the
+[Seeed Studio MR60BHA1](https://www.seeedstudio.com/60GHz-mmWave-Radar-Sensor-Breathing-and-Heartbeat-Module-p-5305.html)
+60 GHz FMCW radar sensor — a dedicated chip that outputs heart rate and breathing
+rate directly via UART.
+
+### Wiring
+
+| MR60BHA1 | ESP32-S3  |
+|----------|-----------|
+| VCC      | 3.3 V     |
+| GND      | GND       |
+| TX       | GPIO 18   |
+| RX       | GPIO 17   |
+
+### Quick start
+
+```python
+from mr60bha1 import MR60BHA1
+import time
+
+radar = MR60BHA1(uart_id=2, tx=17, rx=18)
+
+while True:
+    radar.update()                     # drain UART buffer
+    if radar.ready():
+        print(f"Heart: {radar.bpm} BPM ({radar.bpm_category})")
+        print(f"Breath: {radar.rpm}/min ({radar.rpm_category})")
+    time.sleep_ms(50)
+```
+
+### Callback mode
+
+```python
+def on_frame(f):
+    if "bpm" in f: print("Heart:", f["bpm"], "BPM")
+    if "rpm" in f: print("Breath:", f["rpm"], "/min")
+
+radar = MR60BHA1(uart_id=2, tx=17, rx=18, callback=on_frame)
+while True:
+    radar.update()
+    time.sleep_ms(20)
+```
+
+### MR60BHA1 API
+
+| Method / Property     | Description                                        |
+|-----------------------|----------------------------------------------------|
+| `update()`            | Process UART buffer — call every ~20–50 ms         |
+| `read_blocking(ms)`   | Block until at least one frame arrives             |
+| `ready()`             | True when sensor is measuring and values available |
+| `bpm`                 | Heart rate in BPM (-1 = unknown)                   |
+| `rpm`                 | Breathing rate in breaths/min (-1 = unknown)       |
+| `bpm_category`        | `"normal"` / `"zu schnell"` / `"zu langsam"`       |
+| `rpm_category`        | Same for breathing                                 |
+| `status_str`          | `"initialisierung"` / `"kalibrierung"` / `"messung"` |
+| `bpm_wave`            | Raw heartbeat waveform value (float)               |
+| `rpm_wave`            | Raw breathing waveform value (float)               |
+| `info()`              | Dict with all values + frame statistics            |
+| `set_callback(func)`  | Set/clear frame callback                           |
+| `query_status()`      | Request current status from sensor                 |
+
+### WiFi-CSI vs. MR60BHA1
+
+| | WiFi-CSI (`csi` + `heartbeat`) | MR60BHA1 |
+|---|---|---|
+| Extra cost | 0 € | ~20 € |
+| Warm-up | ~25 s | ~10 s |
+| Accuracy | ±5–15 BPM | ±2–3 BPM |
+| Optimal range | 1–3 m (whole room) | 0.5–1.5 m (directed) |
+| Interference | High (movement, traffic) | Low |
+
+Both can run simultaneously for cross-validation — see `example_mr60bha1.py`.
+
 ## License
 
 MIT
