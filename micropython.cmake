@@ -5,6 +5,7 @@ add_library(usermod_csi INTERFACE)
 
 target_sources(usermod_csi INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/csi.c
+    ${CMAKE_CURRENT_LIST_DIR}/heartbeat.c
 )
 
 target_include_directories(usermod_csi INTERFACE
@@ -16,6 +17,7 @@ target_link_libraries(usermod_csi INTERFACE
     idf::esp_wifi
     idf::esp_event
     idf::freertos
+    m
 )
 
 target_link_libraries(usermod INTERFACE usermod_csi)

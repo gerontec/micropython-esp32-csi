@@ -163,6 +163,59 @@ csi.SIG_HT    # 1  (802.11n)
 csi.SIG_VHT   # 3  (802.11ac)
 ```
 
+## Heartbeat & Breathing Detection
+
+The `heartbeat` module uses the CSI amplitude time series to detect human vital signs in the same room (0.5–3 m from the access point).
+
+### Algorithm
+
+1. **Amplitude**: compute `|H_k| = sqrt(I² + Q²)` for each subcarrier per frame
+2. **Subcarrier selection**: pick the subcarrier with the highest amplitude variance over a sliding window (most motion-sensitive)
+3. **IIR bandpass filters** (4th-order Butterworth, precomputed for 10 Hz sample rate):
+   - Heartbeat: 0.8–2.5 Hz (48–150 BPM)
+   - Breathing: 0.1–0.5 Hz (6–30 breaths/min)
+4. **FFT** (Cooley-Tukey radix-2, N=256) with Hann window → find spectral peak
+5. **First estimate** available after ~25 seconds of data at 10 Hz
+
+### Usage
+
+```python
+import csi, heartbeat
+
+csi.init()
+csi.config(lltf=True, htltf=False, channel_filter=False)
+csi.enable(True)
+
+while True:
+    frame = csi.read(timeout_ms=500)
+    if frame:
+        heartbeat.feed(frame)
+
+    if heartbeat.ready():
+        print(f"Heart: {heartbeat.get_bpm():.1f} BPM  "
+              f"Breath: {heartbeat.get_rpm():.1f} /min")
+```
+
+### Heartbeat API
+
+| Function               | Returns     | Description                                        |
+|------------------------|-------------|----------------------------------------------------|
+| `heartbeat.feed(frame)`| None        | Feed a CSI frame dict from `csi.read()`            |
+| `heartbeat.get_bpm()`  | float       | Latest heart rate estimate in BPM, or -1.0         |
+| `heartbeat.get_rpm()`  | float       | Latest breathing rate (breaths/min), or -1.0       |
+| `heartbeat.ready()`    | bool        | True once enough data has been collected           |
+| `heartbeat.reset()`    | None        | Clear all buffers and state                        |
+| `heartbeat.spectrum()` | list[float] | Power spectrum of heartbeat-filtered signal (debug)|
+| `heartbeat.info()`     | dict        | Debug info: samples, fs, best_subcarrier, bpm, rpm |
+
+### Practical notes
+
+- Person should be within 0.5–3 m, line of sight preferred
+- More WiFi traffic → more CSI frames → better temporal resolution
+- Use `csi.config(channel_filter=False)` for maximum subcarrier independence
+- Results improve significantly after the first minute of continuous data
+- The algorithm is based on: Wang et al., "Understanding and Modeling of WiFi Signal Based Human Activity Recognition", MobiCom 2015
+
 ## License
 
 MIT
